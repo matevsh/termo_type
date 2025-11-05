@@ -48,7 +48,15 @@ pub struct TestEngine {
     pub mode: TestMode,
     /// List of words to type
     pub words: Vec<String>,
-    /// Current word index (which word user is typing)
+    /// Words grouped into lines (5-6 words per line)
+    pub lines: Vec<Vec<String>>,
+    /// Number of words per line
+    pub words_per_line: usize,
+    /// Current line index
+    pub current_line_index: usize,
+    /// Current word index within the current line
+    pub current_word_in_line: usize,
+    /// Current word index (which word user is typing) - global
     pub current_word_index: usize,
     /// Current word state (tracking character-by-character progress)
     pub current_word_state: Option<WordState>,
@@ -64,17 +72,32 @@ pub struct TestEngine {
     pub incorrect_chars: usize,
     /// Whether the result has been saved to profile
     pub result_saved: bool,
+    /// Track which words had errors (for displaying red color)
+    pub word_had_errors: Vec<bool>,
 }
 
 impl TestEngine {
     /// Create a new test engine
     pub fn new(mode: TestMode, words: Vec<String>) -> Self {
+        let words_per_line = 6; // 5-6 words per line
+
+        // Group words into lines
+        let lines: Vec<Vec<String>> = words
+            .chunks(words_per_line)
+            .map(|chunk| chunk.to_vec())
+            .collect();
+
         let current_word_state = words.first().map(|w| WordState::new(w.clone()));
+        let word_count = words.len();
 
         Self {
             state: TestState::NotStarted,
             mode,
             words,
+            lines,
+            words_per_line,
+            current_line_index: 0,
+            current_word_in_line: 0,
             current_word_index: 0,
             current_word_state,
             start_time: None,
@@ -83,6 +106,7 @@ impl TestEngine {
             correct_chars: 0,
             incorrect_chars: 0,
             result_saved: false,
+            word_had_errors: vec![false; word_count],
         }
     }
 
@@ -164,14 +188,28 @@ impl TestEngine {
             return;
         }
 
-        // Update stats from current word
+        // Update stats from current word and track if it had errors
         if let Some(word_state) = &self.current_word_state {
             self.correct_chars += word_state.correct_count();
             self.incorrect_chars += word_state.incorrect_count();
+
+            // Mark if this word had any errors
+            let had_errors = word_state.incorrect_count() > 0;
+            if self.current_word_index < self.word_had_errors.len() {
+                self.word_had_errors[self.current_word_index] = had_errors;
+            }
         }
 
-        // Move to next word
+        // Move to next word in line
+        self.current_word_in_line += 1;
         self.current_word_index += 1;
+
+        // Check if we finished the current line
+        if self.current_word_in_line >= self.words_per_line {
+            // Move to next line
+            self.current_line_index += 1;
+            self.current_word_in_line = 0;
+        }
 
         // Initialize next word state or finish if done
         if let Some(next_word) = self.words.get(self.current_word_index) {
@@ -198,6 +236,8 @@ impl TestEngine {
     /// Reset the test to initial state
     pub fn reset(&mut self) {
         self.state = TestState::NotStarted;
+        self.current_line_index = 0;
+        self.current_word_in_line = 0;
         self.current_word_index = 0;
         self.current_word_state = self.words.first().map(|w| WordState::new(w.clone()));
         self.start_time = None;
@@ -206,6 +246,7 @@ impl TestEngine {
         self.correct_chars = 0;
         self.incorrect_chars = 0;
         self.result_saved = false;
+        self.word_had_errors = vec![false; self.words.len()];
     }
 }
 

@@ -1,0 +1,12 @@
+# rustfmt.toml
+max_width = 120
+use_small_heuristics = "Max"
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+
+# Nie zawijaj importów
+imports_indent = "Block"
+imports_layout = "HorizontalVertical"
+
+# Nie zawijaj argumentów funkcji
+fn_args_layout = "Compressed"
